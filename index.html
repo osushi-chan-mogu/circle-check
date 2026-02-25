@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CircleCheck - 同人誌即売会サークルチェック</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .modal-open { overflow: hidden; }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="bg-stone-100 text-stone-900 min-h-screen pb-24">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-stone-200 sticky top-0 z-30 px-4 py-3 shadow-sm">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <button id="backBtn" class="p-2 hover:bg-stone-100 rounded-full transition-colors hidden" title="戻る">
+                    <i data-lucide="chevron-left" class="text-stone-600"></i>
+                </button>
+                <h1 id="headerTitle" class="text-xl font-bold tracking-tight flex items-center gap-2">
+                    <i data-lucide="check-circle-2" class="text-emerald-600"></i>
+                    CircleCheck
+                </h1>
+            </div>
+            <div class="flex gap-1">
+                <label class="flex flex-col items-center p-1 hover:bg-stone-100 rounded-xl cursor-pointer transition-colors" title="CSVインポート">
+                    <i data-lucide="file-spreadsheet" class="text-stone-600 w-5 h-5"></i>
+                    <span class="text-[8px] font-bold text-stone-500 mt-0.5">CSV読込</span>
+                    <input type="file" id="csvInput" accept=".csv" class="hidden">
+                </label>
+                <label class="flex flex-col items-center p-1 hover:bg-stone-100 rounded-xl cursor-pointer transition-colors" title="JSON復元">
+                    <i data-lucide="upload" class="text-stone-600 w-5 h-5"></i>
+                    <span class="text-[8px] font-bold text-stone-500 mt-0.5">JSON復元</span>
+                    <input type="file" id="jsonInput" accept=".json" class="hidden">
+                </label>
+                <button id="exportBtn" class="flex flex-col items-center p-1 hover:bg-stone-100 rounded-xl transition-colors" title="JSON保存">
+                    <i data-lucide="download" class="text-stone-600 w-5 h-5"></i>
+                    <span class="text-[8px] font-bold text-stone-500 mt-0.5">JSON保存</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4 space-y-6">
+        <!-- Event List View -->
+        <div id="eventListView" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-bold text-stone-500 uppercase tracking-wider">イベントを選択</h2>
+                <button id="addEventBtn" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-sm">
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                    新規イベント
+                </button>
+            </div>
+            <div id="eventGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Events will be injected here -->
+            </div>
+        </div>
+
+        <!-- Circle List View -->
+        <div id="circleListView" class="space-y-6 hidden">
+            <!-- Controls -->
+            <div class="flex flex-col gap-4">
+                <div class="flex flex-wrap gap-2">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 w-5 h-5"></i>
+                        <input type="text" id="searchInput" placeholder="サークル名、作家、スペースで検索..."
+                            class="w-full pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
+                    </div>
+                    <button id="sortBtn" class="px-4 py-2 bg-white border border-stone-200 rounded-xl text-stone-600 hover:bg-stone-50 transition-colors flex items-center gap-2">
+                        <i data-lucide="arrow-up-down" class="w-4 h-4"></i>
+                        <span id="sortLabel">配置順</span>
+                    </button>
+                </div>
+                
+                <!-- Color Filter -->
+                <div class="flex items-center gap-2 overflow-x-auto py-3 px-1 no-scrollbar">
+                    <button onclick="setColorFilter('all')" class="flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all id-filter-all">
+                        すべて
+                    </button>
+                    <script>
+                        const colorFilters = [
+                            { id: 'red', bg: 'bg-red-500' },
+                            { id: 'blue', bg: 'bg-blue-500' },
+                            { id: 'green', bg: 'bg-emerald-500' },
+                            { id: 'yellow', bg: 'bg-amber-500' },
+                            { id: 'purple', bg: 'bg-purple-500' }
+                        ];
+                        document.write(colorFilters.map(f => `
+                            <button onclick="setColorFilter('${f.id}')" class="flex-shrink-0 w-8 h-8 rounded-full border-2 border-white shadow-sm ${f.bg} transition-transform hover:scale-110 id-filter-${f.id}"></button>
+                        `).join(''));
+                    </script>
+                </div>
+
+                <div class="flex items-center justify-between px-1">
+                    <div id="eventStats" class="text-[10px] font-bold text-stone-400 uppercase tracking-widest flex flex-col gap-1 w-full">
+                        <!-- Stats injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- List -->
+            <div id="circleList" class="grid grid-cols-1 gap-4">
+                <!-- Circles will be injected here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- FAB -->
+    <button id="addCircleBtn" class="fixed bottom-6 right-6 w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors z-40">
+        <i data-lucide="plus" class="w-7 h-7"></i>
+    </button>
+
+    <!-- Circle Modal -->
+    <div id="circleModal" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="absolute inset-0 bg-stone-900/60 backdrop-blur-sm modal-overlay"></div>
+        <div class="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-stone-100 flex items-center justify-between sticky top-0 bg-white z-10">
+                <h2 class="text-lg font-bold">サークル詳細</h2>
+                <button class="p-2 hover:bg-stone-100 rounded-full transition-colors close-modal">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-6" id="modalBody">
+                <!-- Modal content injected here -->
+            </div>
+            <div class="p-6 border-t border-stone-100 bg-white sticky bottom-0 flex gap-3">
+                <button class="flex-1 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold hover:bg-stone-200 transition-colors close-modal">キャンセル</button>
+                <button id="saveCircleBtn" class="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="save" class="w-5 h-5"></i>
+                    保存する
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Modal -->
+    <div id="eventModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-stone-900/60 backdrop-blur-sm modal-overlay"></div>
+        <div class="relative w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl">
+            <h2 id="eventModalTitle" class="text-xl font-bold mb-4">新しいイベントを作成</h2>
+            <input type="text" id="newEventName" placeholder="イベント名 (例: コミケ105)"
+                class="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 mb-6">
+            <div class="flex gap-3">
+                <button class="flex-1 py-2 bg-stone-100 text-stone-600 rounded-xl font-bold close-modal">キャンセル</button>
+                <button id="confirmAddEventBtn" class="flex-1 py-2 bg-emerald-600 text-white rounded-xl font-bold">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        const STORAGE_KEY = 'circle_check_data_v1';
+        let state = {
+            circles: [],
+            events: [{ id: 'default', name: 'デフォルトイベント' }],
+            currentEventId: 'default',
+            currentView: 'eventList', // 'eventList' or 'circleList'
+            sortBy: 'space', // 'space' or 'priority'
+            filterColor: 'all' // 'all' or color code
+        };
+
+        const COLORS = [
+            { id: 'none', bg: 'bg-white', border: 'border-stone-200', dark: 'bg-stone-900', text: 'text-stone-600', label: 'なし' },
+            { id: 'red', bg: 'bg-red-50', border: 'border-red-200', dark: 'bg-red-500', text: 'text-red-600', label: '赤' },
+            { id: 'blue', bg: 'bg-blue-50', border: 'border-blue-200', dark: 'bg-blue-500', text: 'text-blue-600', label: '青' },
+            { id: 'green', bg: 'bg-emerald-50', border: 'border-emerald-200', dark: 'bg-emerald-500', text: 'text-emerald-600', label: '緑' },
+            { id: 'yellow', bg: 'bg-amber-50', border: 'border-amber-200', dark: 'bg-amber-500', text: 'text-amber-600', label: '黄' },
+            { id: 'purple', bg: 'bg-purple-50', border: 'border-purple-200', dark: 'bg-purple-500', text: 'text-purple-600', label: '紫' }
+        ];
+
+        let editingCircleId = null;
+        let editingEventId = null;
+        let tempItems = [];
+        let editingItemIdx = null;
+
+        // --- Initialization ---
+        function init() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.circles) state.circles = parsed.circles;
+                    if (parsed.events) state.events = parsed.events;
+                    if (parsed.currentEventId) state.currentEventId = parsed.currentEventId;
+                } catch (e) { console.error(e); }
+            }
+            render();
+            lucide.createIcons();
+        }
+
+        function saveState() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        // --- Utilities ---
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+
+        function getStarsHtml(priority, size = 'w-4 h-4') {
+            const p = Math.min(Math.max(parseInt(priority) || 1, 1), 3);
+            return `
+                <div class="flex gap-0.5">
+                    ${[1, 2, 3].map(v => `
+                        <svg viewBox="0 0 24 24" class="${size} ${v <= p ? 'text-amber-400 fill-current' : 'text-stone-200 fill-current'} transition-colors">
+                            <path d="M12 2.5l2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke="currentColor"/>
+                        </svg>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function compressImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > 400) {
+                            height *= 400 / width;
+                            width = 400;
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    };
+                };
+            });
+        }
+
+        // --- Rendering ---
+        function render() {
+            const isEventView = state.currentView === 'eventList';
+            
+            document.getElementById('eventListView').classList.toggle('hidden', !isEventView);
+            document.getElementById('circleListView').classList.toggle('hidden', isEventView);
+            document.getElementById('backBtn').classList.toggle('hidden', isEventView);
+            document.getElementById('addCircleBtn').classList.toggle('hidden', isEventView);
+            
+            if (isEventView) {
+                document.getElementById('headerTitle').innerHTML = `
+                    <i data-lucide="check-circle-2" class="text-emerald-600"></i>
+                    CircleCheck
+                `;
+                renderEventList();
+            } else {
+                const event = state.events.find(e => e.id === state.currentEventId);
+                document.getElementById('headerTitle').innerText = event ? event.name : 'サークルリスト';
+                renderCircleList();
+            }
+            
+            lucide.createIcons();
+        }
+
+        function renderEventList() {
+            const grid = document.getElementById('eventGrid');
+            grid.innerHTML = state.events.map(e => {
+                const count = state.circles.filter(c => c.eventId === e.id).length;
+                const doneCount = state.circles.filter(c => c.eventId === e.id && c.status === 'done').length;
+                return `
+                    <div class="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group relative">
+                        <div onclick="selectEvent('${e.id}')" class="absolute inset-0 z-0"></div>
+                        <div class="flex items-center justify-between mb-4 relative z-10">
+                            <div onclick="selectEvent('${e.id}')" class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                <i data-lucide="folder" class="w-6 h-6"></i>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="exportEvent('${e.id}')" class="p-2 text-stone-300 hover:text-blue-500 transition-colors" title="イベントを出力">
+                                    <i data-lucide="share" class="w-5 h-5"></i>
+                                </button>
+                                <button onclick="openEventEditModal('${e.id}')" class="p-2 text-stone-300 hover:text-emerald-500 transition-colors">
+                                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                                </button>
+                                <button onclick="deleteEvent('${e.id}')" class="p-2 text-stone-300 hover:text-red-500 transition-colors">
+                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div onclick="selectEvent('${e.id}')" class="relative z-10">
+                            <h3 class="text-lg font-bold mb-1">${e.name}</h3>
+                            <div class="flex items-center gap-3 text-xs font-bold text-stone-400 uppercase tracking-wider">
+                                <span>${count} サークル</span>
+                                <span class="w-1 h-1 bg-stone-200 rounded-full"></span>
+                                <span class="${doneCount === count && count > 0 ? 'text-emerald-500' : ''}">${doneCount} / ${count} 購入済み</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openEventEditModal(id = null) {
+            editingEventId = id;
+            const event = id ? state.events.find(e => e.id === id) : null;
+            document.getElementById('eventModalTitle').innerText = id ? 'イベント名を変更' : '新しいイベントを作成';
+            document.getElementById('newEventName').value = event ? event.name : '';
+            document.getElementById('eventModal').classList.remove('hidden');
+        }
+
+        function deleteEvent(id) {
+            if (confirm('このイベントと所属する全サークルを削除しますか？')) {
+                state.circles = state.circles.filter(c => c.eventId !== id);
+                state.events = state.events.filter(e => e.id !== id);
+                if (state.events.length === 0) {
+                    state.events = [{ id: 'default', name: 'デフォルトイベント' }];
+                }
+                if (state.currentEventId === id) {
+                    state.currentEventId = state.events[0].id;
+                }
+                saveState();
+                render();
+            }
+        }
+
+        function exportEvent(id) {
+            const event = state.events.find(e => e.id === id);
+            if (!event) return;
+            const circles = state.circles.filter(c => c.eventId === id);
+            const data = JSON.stringify({
+                type: 'single_event',
+                event: event,
+                circles: circles
+            }, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `circle_check_event_${event.name}.json`;
+            a.click();
+        }
+
+        function selectEvent(id) {
+            state.currentEventId = id;
+            state.currentView = 'circleList';
+            saveState();
+            render();
+        }
+
+        function renderCircleList() {
+            const list = document.getElementById('circleList');
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            
+            let filtered = state.circles.filter(c => {
+                const matchesSearch = c.name.toLowerCase().includes(query) || 
+                                    c.author.toLowerCase().includes(query) ||
+                                    c.spaceNo.toLowerCase().includes(query) ||
+                                    c.hall.toLowerCase().includes(query);
+                const matchesEvent = c.eventId === state.currentEventId;
+                const matchesColor = state.filterColor === 'all' || c.color === state.filterColor;
+                return matchesSearch && matchesEvent && matchesColor;
+            });
+
+            // Sorting
+            filtered.sort((a, b) => {
+                // Always put pending circles at the top
+                if (a.status !== b.status) {
+                    return a.status === 'pending' ? -1 : 1;
+                }
+
+                if (state.sortBy === 'priority') {
+                    const prioA = a.priority || 1;
+                    const prioB = b.priority || 1;
+                    if (prioA !== prioB) return prioB - prioA;
+                }
+
+                // Default: Sort by hall then spaceNo
+                const hallComp = a.hall.localeCompare(b.hall, 'ja');
+                if (hallComp !== 0) return hallComp;
+                return a.spaceNo.localeCompare(b.spaceNo, 'ja', { numeric: true });
+            });
+
+            // Stats
+            const total = filtered.length;
+            const done = filtered.filter(c => c.status === 'done').length;
+            
+            const getCircleTotal = (c) => c.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            const totalPurchased = filtered.filter(c => c.status === 'done').reduce((sum, c) => sum + getCircleTotal(c), 0);
+            const totalPending = filtered.filter(c => c.status === 'pending').reduce((sum, c) => sum + getCircleTotal(c), 0);
+            
+            const colorStats = COLORS.filter(col => col.id !== 'none').map(col => {
+                const circles = filtered.filter(c => c.color === col.id);
+                if (circles.length === 0) return null;
+                const amount = circles.reduce((sum, c) => sum + getCircleTotal(c), 0);
+                return `<span class="${col.text}">● ${col.label}: ¥${amount.toLocaleString()}</span>`;
+            }).filter(Boolean).join(' ');
+
+            document.getElementById('eventStats').innerHTML = `
+                <div class="flex justify-between items-center border-b border-stone-100 pb-1 mb-1">
+                    <span class="text-xs">${done} / ${total} チェック済み</span>
+                    <div class="flex gap-4">
+                        <div class="flex flex-col items-end">
+                            <span class="text-xs font-bold opacity-60">購入済</span>
+                            <span class="text-base sm:text-lg font-black text-emerald-600 leading-none">¥${totalPurchased.toLocaleString()}</span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-xs font-bold opacity-60">未購入</span>
+                            <span class="text-base sm:text-lg font-black text-rose-500 leading-none">¥${totalPending.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-x-3 gap-y-1 opacity-80">
+                    ${colorStats || '<span>カラー別集計なし</span>'}
+                </div>
+            `;
+
+            // Update color filter UI
+            document.querySelectorAll('[class*="id-filter-"]').forEach(el => {
+                el.classList.remove('ring-4', 'ring-emerald-500/30', 'border-emerald-500', 'bg-emerald-500', 'text-white');
+                el.classList.add('border-stone-200', 'text-stone-500');
+            });
+            const activeFilter = document.querySelector(`.id-filter-${state.filterColor}`);
+            if (activeFilter) {
+                if (state.filterColor === 'all') {
+                    activeFilter.classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
+                } else {
+                    activeFilter.classList.add('ring-4', 'ring-emerald-500/30', 'border-emerald-500');
+                }
+            }
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="py-20 text-center text-stone-400"><p>サークルが見つかりません</p></div>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(c => {
+                const isDone = c.status === 'done';
+                const firstImg = c.items.find(i => i.image)?.image;
+                const totalPrice = c.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const priority = Math.min(Math.max(parseInt(c.priority) || 1, 1), 3);
+                const stars = '★'.repeat(priority) + '☆'.repeat(3 - priority);
+                
+                const circleColor = COLORS.find(col => col.id === (c.color || 'none')) || COLORS[0];
+                const cardBg = isDone ? 'bg-emerald-50/20' : circleColor.bg;
+                const cardBorder = isDone ? 'border-emerald-500' : circleColor.border;
+                const spaceBg = isDone ? 'bg-emerald-600' : circleColor.dark;
+                
+                return `
+                    <div onclick="openEditModal('${c.id}')" class="rounded-3xl border-2 ${cardBorder} ${cardBg} overflow-hidden shadow-sm hover:shadow-md transition-all flex h-32 cursor-pointer relative group ${isDone ? 'grayscale opacity-60' : ''}">
+                        <!-- Left: Thumbnail -->
+                        <div class="w-24 sm:w-32 bg-stone-100 flex-shrink-0 relative overflow-hidden border-r border-stone-100">
+                            ${firstImg ? `<img src="${firstImg}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-stone-300"><i data-lucide="image" class="w-8 h-8"></i></div>`}
+                        </div>
+
+                        <!-- Right: Main Content -->
+                        <div class="flex-1 p-2 flex flex-col min-w-0">
+                            <div class="flex items-start justify-between mb-1">
+                                <div class="${spaceBg} text-white px-2 py-0.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+                                    <span class="text-[10px] font-bold opacity-80 uppercase tracking-tighter">${c.hall}</span>
+                                    <span class="text-xs font-black">${c.spaceNo}</span>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 mb-1 min-h-0">
+                                <h3 class="font-bold text-sm sm:text-base leading-tight pr-10 truncate">${c.name || '(名称未設定)'}</h3>
+                                <p class="text-[10px] text-stone-500 truncate">${c.author}</p>
+                                <div class="mt-1">${getStarsHtml(c.priority, 'w-3.5 h-3.5')}</div>
+                                ${c.memo ? `<p class="text-[9px] text-stone-400 line-clamp-1 mt-1 italic border-t border-stone-100 pt-0.5">${c.memo}</p>` : ''}
+                            </div>
+                            
+                            <div class="mt-auto flex items-end justify-end gap-2">
+                                <div class="text-right">
+                                    <span class="text-[9px] font-bold text-stone-400 uppercase tracking-widest mr-1">${c.items.length}種</span>
+                                    <span class="text-[9px] font-bold text-stone-400 uppercase tracking-widest">合計</span>
+                                    <div class="text-base font-black text-emerald-600 leading-none mt-0.5">¥${totalPrice.toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Check Button -->
+                        <button onclick="event.stopPropagation(); toggleStatus('${c.id}')" 
+                            class="absolute top-0 right-0 w-14 h-14 flex items-center justify-center rounded-bl-3xl transition-all ${isDone ? 'bg-emerald-500 text-white' : 'bg-stone-100/80 backdrop-blur-sm text-stone-300 hover:bg-stone-200'}">
+                            <i data-lucide="${isDone ? 'check-circle-2' : 'circle'}" class="w-8 h-8"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- Actions ---
+        function toggleStatus(id) {
+            const c = state.circles.find(x => x.id === id);
+            if (c) {
+                c.status = c.status === 'pending' ? 'done' : 'pending';
+                saveState();
+                render();
+            }
+        }
+
+        function deleteCircle(id) {
+            if (confirm('削除しますか？')) {
+                state.circles = state.circles.filter(x => x.id !== id);
+                saveState();
+                render();
+            }
+        }
+
+        function openEditModal(id = null) {
+            editingCircleId = id;
+            editingItemIdx = null;
+            const c = id ? state.circles.find(x => x.id === id) : {
+                name: '', hall: '', spaceNo: '', author: '', memo: '', url: '', items: [], priority: 1, color: 'none'
+            };
+            tempItems = [...c.items.map(i => ({...i}))];
+            const priority = c.priority || 1;
+            const circleColor = c.color || 'none';
+            
+            const body = document.getElementById('modalBody');
+            body.innerHTML = `
+                <div class="space-y-6">
+                    <!-- Color & Priority Row -->
+                    <div class="flex flex-wrap items-end gap-6">
+                        <div class="flex-1 min-w-[180px]">
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-3">カードカラー</label>
+                            <div class="flex gap-2 overflow-x-auto py-3 px-1 no-scrollbar">
+                                ${COLORS.map(col => `
+                                    <button onclick="setCircleColor('${col.id}')" id="color-${col.id}" 
+                                        class="flex-shrink-0 w-7 h-7 rounded-full border-2 transition-all ${col.dark} ${circleColor === col.id ? 'border-emerald-500 ring-4 ring-emerald-500/20 scale-110' : 'border-white shadow-sm'}">
+                                    </button>
+                                `).join('')}
+                                <input type="hidden" id="editColor" value="${circleColor}">
+                            </div>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-3">優先度</label>
+                            <div class="flex gap-1 cursor-pointer select-none" id="priorityStars">
+                                ${[1, 2, 3].map(v => `
+                                    <div onclick="setPriority(${v})" id="star-${v}" class="transition-transform active:scale-90">
+                                        <svg viewBox="0 0 24 24" class="w-7 h-7 ${priority >= v ? 'text-amber-400 fill-current' : 'text-stone-200 fill-current'} transition-colors">
+                                            <path d="M12 2.5l2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke="currentColor"/>
+                                        </svg>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <input type="hidden" id="editPriority" value="${priority}">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">サークル名</label>
+                            <input type="text" id="editName" value="${c.name}" class="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">作家名</label>
+                            <input type="text" id="editAuthor" value="${c.author}" class="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">ホール</label>
+                            <input type="text" id="editHall" value="${c.hall}" placeholder="東1" class="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">スペース</label>
+                            <input type="text" id="editSpace" value="${c.spaceNo}" placeholder="あ01a" class="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">URL</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="editUrl" value="${c.url}" class="flex-1 px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl">
+                                <button onclick="openUrl()" class="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors">
+                                    <i data-lucide="external-link" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">メモ</label>
+                            <textarea id="editMemo" class="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl h-10">${c.memo}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <label class="block text-xs font-bold text-stone-400 uppercase">頒布物情報</label>
+                        <div id="itemList" class="space-y-3"></div>
+                        <div class="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-3">
+                            <div class="flex gap-3">
+                                <div class="w-24 h-24 bg-white border-2 border-dashed border-stone-200 rounded-xl overflow-hidden relative flex-shrink-0">
+                                    <div id="newItemPreview" class="w-full h-full flex flex-col items-center justify-center text-stone-400 gap-1">
+                                        <i data-lucide="image" class="w-6 h-6"></i><span class="text-[10px]">画像</span>
+                                    </div>
+                                    <input type="file" id="newItemImage" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+                                </div>
+                                <div class="flex-1 space-y-2">
+                                    <input type="text" id="newItemName" placeholder="品名" class="w-full px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <input type="number" id="newItemPrice" placeholder="金額" class="w-full px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm">
+                                        <input type="number" id="newItemQty" placeholder="個数" value="1" class="w-full px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="addItemBtn" onclick="addItem()" class="w-full py-2 bg-stone-200 text-stone-600 rounded-lg text-sm font-bold hover:bg-emerald-600 hover:text-white transition-all">頒布物を追加</button>
+                        </div>
+                    </div>
+
+                    ${id ? `
+                        <div class="pt-6 border-t border-stone-100">
+                            <button onclick="deleteCircle('${id}'); closeModal();" class="w-full py-3 text-red-400 hover:text-red-600 font-bold text-sm flex items-center justify-center gap-2">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                このサークルを削除する
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            renderItems();
+            document.getElementById('circleModal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+            lucide.createIcons();
+
+            document.getElementById('newItemImage').onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const base64 = await compressImage(file);
+                    document.getElementById('newItemPreview').innerHTML = `<img src="${base64}" class="w-full h-full object-cover">`;
+                    document.getElementById('newItemPreview').dataset.image = base64;
+                }
+            };
+        }
+
+        function renderItems() {
+            const list = document.getElementById('itemList');
+            list.innerHTML = tempItems.map((item, idx) => `
+                <div class="flex items-center gap-3 bg-stone-50 p-3 rounded-2xl border border-stone-100 group">
+                    <!-- Reorder Buttons -->
+                    <div class="flex flex-col gap-1">
+                        <button onclick="moveItem(${idx}, -1)" class="p-1 text-stone-300 hover:text-emerald-500 transition-colors ${idx === 0 ? 'invisible' : ''}">
+                            <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="moveItem(${idx}, 1)" class="p-1 text-stone-300 hover:text-emerald-500 transition-colors ${idx === tempItems.length - 1 ? 'invisible' : ''}">
+                            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <button onclick="toggleItemPurchased(${idx})" class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${item.purchased ? 'bg-emerald-500 text-white shadow-lg scale-110' : 'bg-white border-2 border-stone-200 text-stone-200 hover:border-emerald-300'}">
+                        <i data-lucide="check" class="w-6 h-6"></i>
+                    </button>
+                    <div class="w-20 h-20 sm:w-24 sm:h-24 bg-stone-200 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer shadow-sm" onclick="editItem(${idx})">
+                        ${item.image ? `<img src="${item.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-stone-400"><i data-lucide="image" class="w-8 h-8"></i></div>`}
+                    </div>
+                    <div class="flex-1 min-w-0 cursor-pointer" onclick="editItem(${idx})">
+                        <p class="font-bold text-base sm:text-lg truncate ${item.purchased ? 'text-stone-400 line-through opacity-50' : ''}">${item.name || '(品名なし)'}</p>
+                        <p class="text-sm font-black text-stone-500 mt-1">¥${item.price.toLocaleString()} <span class="text-xs font-normal text-stone-400">× ${item.quantity}</span></p>
+                    </div>
+                    <button onclick="removeItem(${idx})" class="p-2 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function moveItem(idx, direction) {
+            const newIdx = idx + direction;
+            if (newIdx < 0 || newIdx >= tempItems.length) return;
+            const item = tempItems[idx];
+            tempItems.splice(idx, 1);
+            tempItems.splice(newIdx, 0, item);
+            renderItems();
+        }
+
+        function toggleItemPurchased(idx) {
+            tempItems[idx].purchased = !tempItems[idx].purchased;
+            renderItems();
+        }
+
+        function editItem(idx) {
+            editingItemIdx = idx;
+            const item = tempItems[idx];
+            document.getElementById('newItemName').value = item.name;
+            document.getElementById('newItemPrice').value = item.price;
+            document.getElementById('newItemQty').value = item.quantity;
+            if (item.image) {
+                document.getElementById('newItemPreview').innerHTML = `<img src="${item.image}" class="w-full h-full object-cover">`;
+                document.getElementById('newItemPreview').dataset.image = item.image;
+            } else {
+                document.getElementById('newItemPreview').innerHTML = `<i data-lucide="image" class="w-6 h-6"></i><span class="text-[10px]">画像</span>`;
+                delete document.getElementById('newItemPreview').dataset.image;
+            }
+            document.getElementById('addItemBtn').innerText = '編集を保存';
+            document.getElementById('addItemBtn').classList.add('bg-emerald-600', 'text-white');
+            document.getElementById('addItemBtn').classList.remove('bg-stone-200', 'text-stone-600');
+        }
+
+        function addItem() {
+            const name = document.getElementById('newItemName').value;
+            const price = parseInt(document.getElementById('newItemPrice').value) || 0;
+            const quantity = parseInt(document.getElementById('newItemQty').value) || 1;
+            const image = document.getElementById('newItemPreview').dataset.image || '';
+            
+            if (editingItemIdx !== null) {
+                tempItems[editingItemIdx] = { ...tempItems[editingItemIdx], name, price, quantity, image };
+                editingItemIdx = null;
+            } else {
+                tempItems.push({ id: generateId(), name, price, quantity, image, purchased: false });
+            }
+            
+            document.getElementById('newItemName').value = '';
+            document.getElementById('newItemPrice').value = '';
+            document.getElementById('newItemQty').value = '1';
+            document.getElementById('newItemPreview').innerHTML = `<i data-lucide="image" class="w-6 h-6"></i><span class="text-[10px]">画像</span>`;
+            delete document.getElementById('newItemPreview').dataset.image;
+            
+            document.getElementById('addItemBtn').innerText = '頒布物を追加';
+            document.getElementById('addItemBtn').classList.remove('bg-emerald-600', 'text-white');
+            document.getElementById('addItemBtn').classList.add('bg-stone-200', 'text-stone-600');
+            
+            renderItems();
+        }
+
+        function removeItem(idx) {
+            tempItems.splice(idx, 1);
+            renderItems();
+        }
+
+        function setPriority(val) {
+            document.getElementById('editPriority').value = val;
+            [1, 2, 3].forEach(v => {
+                const star = document.getElementById(`star-${v}`).querySelector('svg');
+                if (v <= val) {
+                    star.classList.add('text-amber-400', 'fill-current');
+                    star.classList.remove('text-stone-200');
+                } else {
+                    star.classList.remove('text-amber-400', 'fill-current');
+                    star.classList.add('text-stone-200');
+                }
+            });
+        }
+
+        function setCircleColor(id) {
+            document.getElementById('editColor').value = id;
+            COLORS.forEach(col => {
+                const btn = document.getElementById(`color-${col.id}`);
+                if (col.id === id) {
+                    btn.classList.add('border-emerald-500', 'ring-4', 'ring-emerald-500/20', 'scale-110');
+                    btn.classList.remove('border-white', 'shadow-sm');
+                } else {
+                    btn.classList.remove('border-emerald-500', 'ring-4', 'ring-emerald-500/20', 'scale-110');
+                    btn.classList.add('border-white', 'shadow-sm');
+                }
+            });
+        }
+
+        function setColorFilter(id) {
+            state.filterColor = id;
+            saveState();
+            render();
+        }
+
+        function openUrl() {
+            const url = document.getElementById('editUrl').value;
+            if (url) {
+                window.open(url.startsWith('http') ? url : `https://${url}`, '_blank');
+            }
+        }
+
+        // --- Event Handlers ---
+        function closeModal() {
+            document.getElementById('circleModal').classList.add('hidden');
+            document.getElementById('eventModal').classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+
+        document.getElementById('saveCircleBtn').onclick = () => {
+            const editingCircle = editingCircleId ? state.circles.find(x => x.id === editingCircleId) : null;
+            let status = editingCircle ? editingCircle.status : 'pending';
+            
+            // Auto-check logic: If all items are purchased, set status to done
+            if (tempItems.length > 0 && tempItems.every(item => item.purchased)) {
+                status = 'done';
+            } else if (tempItems.length > 0 && tempItems.some(item => !item.purchased) && status === 'done') {
+                // Optional: If some items are unchecked and it was 'done', maybe keep it 'done' or revert?
+                // The user said "if all are checked, card check is auto entered". 
+                // We'll stick to that.
+            }
+
+            const circle = {
+                id: editingCircleId || generateId(),
+                name: document.getElementById('editName').value,
+                hall: document.getElementById('editHall').value,
+                spaceNo: document.getElementById('editSpace').value,
+                author: document.getElementById('editAuthor').value,
+                url: document.getElementById('editUrl').value,
+                memo: document.getElementById('editMemo').value,
+                priority: parseInt(document.getElementById('editPriority').value) || 1,
+                color: document.getElementById('editColor').value || 'none',
+                items: tempItems,
+                status: status,
+                eventId: state.currentEventId
+            };
+            if (editingCircleId) {
+                state.circles = state.circles.map(x => x.id === editingCircleId ? circle : x);
+            } else {
+                state.circles.push(circle);
+            }
+            saveState();
+            render();
+            closeModal();
+        };
+
+        document.getElementById('addEventBtn').onclick = () => {
+            openEventEditModal();
+        };
+
+        document.getElementById('confirmAddEventBtn').onclick = () => {
+            const name = document.getElementById('newEventName').value;
+            if (!name) return;
+            
+            if (editingEventId) {
+                state.events = state.events.map(e => e.id === editingEventId ? { ...e, name } : e);
+            } else {
+                const id = generateId();
+                state.events.push({ id, name });
+                state.currentEventId = id;
+            }
+            
+            document.getElementById('newEventName').value = '';
+            editingEventId = null;
+            saveState();
+            render();
+            document.getElementById('eventModal').classList.add('hidden');
+        };
+
+        document.getElementById('backBtn').onclick = () => {
+            state.currentView = 'eventList';
+            saveState();
+            render();
+        };
+
+        document.getElementById('sortBtn').onclick = () => {
+            state.sortBy = state.sortBy === 'space' ? 'priority' : 'space';
+            document.getElementById('sortLabel').innerText = state.sortBy === 'space' ? '配置順' : '優先度順';
+            saveState();
+            render();
+        };
+
+        document.getElementById('searchInput').oninput = render;
+
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.onclick = closeModal;
+        });
+
+        document.getElementById('addCircleBtn').onclick = () => openEditModal();
+
+        // --- Import/Export ---
+        document.getElementById('exportBtn').onclick = () => {
+            const data = JSON.stringify(state, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `circle_check_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        };
+
+        document.getElementById('jsonInput').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    
+                    // Single Event Import (Merge)
+                    if (data.type === 'single_event' && data.event && data.circles) {
+                        if (confirm(`イベント「${data.event.name}」をインポートしますか？\n(既存のデータは保持され、新しいイベントとして追加されます)`)) {
+                            // Generate new IDs to avoid collisions and keep existing data
+                            const newEventId = generateId();
+                            const importedEvent = { ...data.event, id: newEventId };
+                            state.events.push(importedEvent);
+                            
+                            data.circles.forEach(c => {
+                                state.circles.push({ 
+                                    ...c, 
+                                    id: generateId(), 
+                                    eventId: newEventId 
+                                });
+                            });
+                            
+                            saveState();
+                            render();
+                            alert('イベントをインポートしました');
+                        }
+                    } 
+                    // Full Backup Import
+                    else if (data.circles && data.events) {
+                        const mode = confirm('データをどのように読み込みますか？\n\n【OK】: 現在のデータに「追加」する\n【キャンセル】: 現在のデータを「上書き」する') ? 'merge' : 'overwrite';
+                        
+                        if (mode === 'merge') {
+                            // Merge events and circles with new IDs to prevent collisions
+                            data.events.forEach(oldEvent => {
+                                const newEventId = generateId();
+                                state.events.push({ ...oldEvent, id: newEventId });
+                                
+                                const eventCircles = data.circles.filter(c => c.eventId === oldEvent.id);
+                                eventCircles.forEach(c => {
+                                    state.circles.push({ ...c, id: generateId(), eventId: newEventId });
+                                });
+                            });
+                            alert('データを追加しました');
+                        } else {
+                            if (confirm('本当に上書きしますか？現在のデータはすべて消去されます。')) {
+                                state = data;
+                                alert('データを上書きしました');
+                            } else {
+                                return;
+                            }
+                        }
+                        saveState();
+                        render();
+                    }
+                } catch (err) { alert('読み込み失敗: ファイル形式が正しくありません'); }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        };
+
+        document.getElementById('csvInput').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const text = ev.target.result;
+                    const lines = text.split(/\r?\n/);
+                    const newCircles = [];
+                    
+                    // 1行目はヘッダーなので2行目（インデックス1）から開始
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        // カンマ区切りで分割
+                        const cols = line.split(',').map(c => c.replace(/^"|"$/g, ''));
+                        
+                        // row[4]:ホール, row[5]:スペースNo, row[6]:サークル名, row[7]:作家名
+                        if (cols.length >= 8) {
+                            newCircles.push({
+                                id: generateId(),
+                                hall: cols[4] || '',
+                                spaceNo: cols[5] || '',
+                                name: cols[6] || '',
+                                author: cols[7] || '',
+                                memo: '',
+                                url: '',
+                                status: 'pending',
+                                items: [],
+                                eventId: state.currentEventId
+                            });
+                        }
+                    }
+                    
+                    if (newCircles.length > 0) {
+                        if (confirm(`${newCircles.length}件のサークルをインポートしますか？`)) {
+                            state.circles.push(...newCircles);
+                            saveState();
+                            render();
+                            alert(`${newCircles.length}件読み込みました`);
+                        }
+                    } else {
+                        alert('有効なデータが見つかりませんでした。CSVの形式を確認してください。');
+                    }
+                } catch (err) { 
+                    alert('CSV読み込み中にエラーが発生しました。'); 
+                }
+            };
+            
+            // 標準的なShift-JIS読み込み
+            reader.readAsText(file, 'Shift-JIS');
+            e.target.value = '';
+        };
+
+        init();
+    </script>
+</body>
+</html>
