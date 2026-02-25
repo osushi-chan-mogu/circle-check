@@ -344,6 +344,9 @@
                     if (parsed.events) state.events = parsed.events;
                     if (parsed.eventMaps) state.eventMaps = parsed.eventMaps;
                     if (parsed.currentEventId) state.currentEventId = parsed.currentEventId;
+                    if (parsed.sortBy) state.sortBy = parsed.sortBy;
+                    if (parsed.filterColor) state.filterColor = parsed.filterColor;
+                    if (parsed.currentView) state.currentView = parsed.currentView;
                 } catch (e) { console.error(e); }
             }
             render();
@@ -511,6 +514,12 @@
             const selectionActions = document.getElementById('selectionActions');
             const selectionCount = document.getElementById('selectionCount');
             
+            // Update sort label
+            const sortLabel = document.getElementById('sortLabel');
+            if (sortLabel) {
+                sortLabel.innerText = state.sortBy === 'space' ? '配置順' : '優先度順';
+            }
+
             // Update selection UI
             if (isSelectionMode) {
                 selectionActions.classList.remove('hidden');
@@ -543,9 +552,9 @@
                 }
 
                 // Default: Sort by hall then spaceNo
-                const hallComp = a.hall.localeCompare(b.hall, 'ja');
+                const hallComp = (a.hall || '').localeCompare(b.hall || '', 'ja');
                 if (hallComp !== 0) return hallComp;
-                return a.spaceNo.localeCompare(b.spaceNo, 'ja', { numeric: true });
+                return (a.spaceNo || '').localeCompare(b.spaceNo || '', 'ja', { numeric: true });
             });
 
             // Stats
@@ -1380,11 +1389,33 @@
                 }
 
                 if (circles && circles.length > 0) {
-                    if (confirm(`${circles.length}件のサークルを追加しますか？`)) {
-                        state.circles.push(...circles);
+                    const existingInEvent = state.circles.filter(c => c.eventId === state.currentEventId);
+                    const toAdd = [];
+                    let skippedCount = 0;
+
+                    circles.forEach(newCircle => {
+                        const isDuplicate = existingInEvent.some(ex => 
+                            ex.name === newCircle.name && 
+                            ex.hall === newCircle.hall && 
+                            ex.spaceNo === newCircle.spaceNo
+                        );
+                        if (isDuplicate) {
+                            skippedCount++;
+                        } else {
+                            toAdd.push(newCircle);
+                        }
+                    });
+
+                    if (toAdd.length === 0) {
+                        alert(`既にあるデータと重複しているため、新規追加はありませんでした。（${skippedCount}件スキップ）`);
+                        return;
+                    }
+
+                    if (confirm(`${toAdd.length}件の新しいサークルを追加しますか？\n(重複した${skippedCount}件はスキップされます)`)) {
+                        state.circles.push(...toAdd);
                         saveState();
                         render();
-                        alert(`${circles.length}件のサークルを追加しました`);
+                        alert(`${toAdd.length}件の新しいサークルを追加しました。（既にある${skippedCount}件のサークルはスキップしました）`);
                     }
                 } else {
                     alert('有効なデータが見つかりませんでした。navioのCSV形式であることを確認してください。');
