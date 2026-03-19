@@ -891,8 +891,8 @@
                         ${item.image ? `<img src="${item.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-stone-400"><i data-lucide="image" class="w-8 h-8"></i></div>`}
                     </div>
                     <div class="flex-1 min-w-0 cursor-pointer" onclick="editItem(${idx})">
-                        <p class="font-bold text-base sm:text-lg truncate ${item.purchased ? 'text-stone-400 line-through opacity-50' : ''}">${item.name || '(品名なし)'}</p>
-                        <p class="text-sm font-black text-stone-500 mt-1">¥${item.price.toLocaleString()} <span class="text-xs font-normal text-stone-400">× ${item.quantity}</span></p>
+                        <p class="font-bold text-xs sm:text-sm truncate ${item.purchased ? 'text-stone-300 line-through opacity-50' : 'text-stone-400'}">${item.name || '(品名なし)'}</p>
+                        <p class="text-xl sm:text-2xl font-black text-stone-800 mt-0.5">¥${item.price.toLocaleString()} <span class="text-lg sm:text-xl font-bold text-stone-500 ml-1">× ${item.quantity}</span></p>
                     </div>
                     <button onclick="removeItem(${idx})" class="p-2 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
                 </div>
